@@ -6,12 +6,11 @@ import bodyParser from 'body-parser'
 import redis from 'redis'
 import connRedis from 'connect-redis'
 
-const RedisStore = connRedis(session)
-
 const app = express()
 const server = http.Server(app)
 const io = sio(server)
 
+const RedisStore = connRedis(session)
 const redisClient = redis.createClient()
 redisClient.on('ready', () => {
   console.log("redis is ready")
@@ -59,10 +58,20 @@ chat.on('connection', socket => {
   socket.on('disconnect', () => {
     console.log('disconnected: ', sessionID)
     // 2초 기다렸다가 세션 지우고 나갔음을 broadcast 하기
+    setTimeout(function() {
+      
+      store.get(sessionID, (err, sess) => {
+        if(sess && sess.username){
+          chat.emit('left', { description: sessionID + ' disconnected'})
+          store.destroy(sessionID)
+        }
+      })
+    }, 2000);
+/*
     store.get(sessionID, (err, sess) => {
       
       chat.emit('left', sess.username)
-    })
+    })*/
   })
 })
 
@@ -87,6 +96,7 @@ app.post('/join', (req, res) => {
   
   checkOverlapName(name)
     .then(() => {
+      // 세션 스토어에 저장됨
       req.session.username = name
       req.session.active = true
       chat.emit('join', name)

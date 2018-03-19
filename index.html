@@ -42,10 +42,15 @@
             console.log('[chat]', username, message)
             addChatRow(username, message)
           })
+          .on('left', function(data){
+            $('#chats').append(data.description+'\n');
+            $('#chats').scrollTop($('#chats')[0].scrollHeight);
+          })
+          /*
           .on('left', (username) => {
             console.log('[left]', username)
             removeUserRow(username)
-          })
+          })*/
       }
 
       function sendChatMessage(message) {
