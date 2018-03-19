@@ -35,11 +35,16 @@ app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({extended: false}))
 
 const chat = io.of('chat')
+const waitExpires = new Set()
 
 // 웹소켓 처리
 chat.on('connection', socket => {
   const { sessionID } = socket.request
 
+  if(waitExpires.has(sessionID)){
+    waitExpires.delete(sessionID)
+  }
+  
   // 서버에 의해 활성화 된(접속 허가 된) 사용자의 참가
   console.log('a user connected: ', sessionID)
   socket.emit('connected')
@@ -48,7 +53,7 @@ chat.on('connection', socket => {
   socket.on('chat', (message) => {
     store.get(sessionID, (err, sess) => {
       console.log(sessionID)                                        
-      if(sess.active){
+      if(sess && sess.active){
         console.log(sess.username, sessionID, ': ', message)
         chat.emit('chat', sess.username, message)
       }
@@ -56,22 +61,18 @@ chat.on('connection', socket => {
   })
 
   socket.on('disconnect', () => {
-    console.log('disconnected: ', sessionID)
     // 2초 기다렸다가 세션 지우고 나갔음을 broadcast 하기
+    waitExpires.add(sessionID)
+
     setTimeout(function() {
-      
       store.get(sessionID, (err, sess) => {
-        if(sess && sess.username){
-          chat.emit('left', { description: sessionID + ' disconnected'})
+        if(waitExpires.has(sessionID) && sess && sess.username){
+          console.log('disconnected: ', sessionID)
+          chat.emit('left', sess.username)
           store.destroy(sessionID)
         }
       })
-    }, 2000);
-/*
-    store.get(sessionID, (err, sess) => {
-      
-      chat.emit('left', sess.username)
-    })*/
+    }, 1000);
   })
 })
 
@@ -90,18 +91,25 @@ app.get('/users', (req, res) => {
 
 // 채팅 참여 하기 (닉네임 중복 여부 체크)
 app.post('/join', (req, res) => {
-  const name = req.body.name
   // join을 했는데 세션에 username이 존재하면 username 교체
   // 세션에 username이 없으면 새로 참여
-  
-  checkOverlapName(name)
+  const newname = req.body.username
+  const originalname = req.session.username;
+
+  checkOverlapName(newname)
     .then(() => {
-      // 세션 스토어에 저장됨
-      req.session.username = name
-      req.session.active = true
-      chat.emit('join', name)
-  
-      res.json({status: 'success', name})
+      if(originalname) {
+        req.session.username = newname
+        chat.emit('change', {username: originalname, newname})
+        res.json({status: 'change', username: originalname, newname})
+      }
+      else{
+        req.session.username = newname
+        req.session.active = true
+        chat.emit('join', newname)
+    
+        res.json({status: 'join', username: newname})
+      }
     })
     .catch(() => {
       res.json({status: 'overlap'})
@@ -113,8 +121,10 @@ const checkOverlapName = (name) => {
   return new Promise((resolve, reject) => {
     store.all((err, sessions) => {
       sessions.map(sess => {
-        if(sess.username === name)
+        if(sess.username === name){
+          console.log('overlaped')
           reject()
+        }
       })
       resolve()
     })

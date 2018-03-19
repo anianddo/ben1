@@ -13,9 +13,9 @@
       let socket = null
       let myname = null
 
-      function joinWithName(name) {
-        $.post('/join', {name}, function({status, name}) {
-          console.log(status, name)
+      function joinWithName(username) {
+        $.post('/join', {username}, function({status, username, newname}) {
+          console.log(status, username, newname)
         })
       }
 
@@ -42,15 +42,16 @@
             console.log('[chat]', username, message)
             addChatRow(username, message)
           })
-          .on('left', function(data){
-            $('#chats').append(data.description+'\n');
-            $('#chats').scrollTop($('#chats')[0].scrollHeight);
-          })
-          /*
           .on('left', (username) => {
             console.log('[left]', username)
             removeUserRow(username)
-          })*/
+            addInformationRow(`${username} has been left`)
+          })
+          .on('change', ({username, newname}) => {
+            console.log('[change]', newname)
+            removeUserRow(username)
+            addUserRow(newname)
+          })
       }
 
       function sendChatMessage(message) {
@@ -64,11 +65,15 @@
       }
 
       function removeUserRow(username) {
-        $('div#users').remove(`#${username}`)
+        $(`#${username}`).remove()
       }
 
       function addChatRow(username, message) {
         $('div#chats').append(`<div>${username}: ${message}</div>`)
+      }
+
+      function addInformationRow(message) {
+        $('div#chats').append(`<div>${message}</div>`)
       }
 
       function setMyName(username) {
@@ -82,9 +87,9 @@
       $('input:submit').click(function(){
         event.preventDefault()
         
-        const name = $('input#name').val().trim()
-        if(name.length)
-          joinWithName(name)
+        const username = $('input#name').val().trim()
+        if(username.length)
+          joinWithName(username)
       })
 
       $('button#btn-chat').click(function(){
