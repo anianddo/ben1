@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Page Title</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.slim.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <script>
+    $(() => {
+      let userList = []
+      let socket = null
+      let myname = null
+
+      function joinWithName(name) {
+        $.post('/join', {name}, function({status, name}) {
+          console.log(status, name)
+        })
+      }
+
+      function getUserList() {
+        $.get('/users', function({users}) {
+          console.log(users)
+          userList = users
+          userList.map(username => {
+            addUserRow(username)
+          })
+        })
+      }
+
+      function startSocketio() {
+        socket = io('http://localhost:3000/chat')
+          .on('connected', function() {
+            console.log('socket connected')
+          })
+          .on('join', (username) => {
+            console.log('[join]', username)
+            addUserRow(username)
+          })
+          .on('chat', (username, message) => {
+            console.log('[chat]', username, message)
+            addChatRow(username, message)
+          })
+          .on('left', (username) => {
+            console.log('[left]', username)
+            removeUserRow(username)
+          })
+      }
+
+      function sendChatMessage(message) {
+        if(message.length){
+          socket.emit('chat', message)
+        }
+      }
+
+      function addUserRow(username) {
+        $('div#users').append(`<div id='${username}'>${username}</div>`)
+      }
+
+      function removeUserRow(username) {
+        $('div#users').remove(`#${username}`)
+      }
+
+      function addChatRow(username, message) {
+        $('div#chats').append(`<div>${username}: ${message}</div>`)
+      }
+
+      function setMyName(username) {
+        
+      }
+      
+      // 초기화
+      getUserList()
+      startSocketio()
+
+      $('input:submit').click(function(){
+        event.preventDefault()
+        
+        const name = $('input#name').val().trim()
+        if(name.length)
+          joinWithName(name)
+      })
+
+      $('button#btn-chat').click(function(){
+        event.preventDefault()
+
+        const message = $('input#message').val().trim()
+        sendChatMessage(message)
+        $('input#message').val("")
+      })
+
+      $('input#message').on('keydown', function(e){
+        if(e.keyCode === 13) {
+          const message = $('input#message').val().trim()
+          sendChatMessage(message)
+          $('input#message').val("")
+        }
+      })
+    })
+
+  </script>
+</head>
+<body>
+  <form method="POST">
+    <input type="text" name="name" id="name" placeholder="닉네임"/>
+    <input type="submit" value="닉네임 정하기"/>
+    <label id="my-name"></label>
+  </form>
+  <div style="display:flex">
+    <div id="users" style="flex: 1; height: 400px; background-color: yellow;">
+
+    </div>
+    <div id="chats" style="flex: 2; height: 400px; background-color: pink;">
+  
+    </div>
+  </div>
+  <div id="input">
+    <input style="width: 100%" type="text" id="message"/>
+    <button style="width: 100%" id="btn-chat">전송</button>
+  </div>
+
+</body>
+</html>
