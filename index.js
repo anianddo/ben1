@@ -6,6 +6,8 @@ import bodyParser from 'body-parser'
 import redis from 'redis'
 import connRedis from 'connect-redis'
 
+const https = require('https')
+const fs = require('fs')
 const app = express()
 const server = http.Server(app)
 const io = sio(server)
@@ -27,6 +29,10 @@ const sessionMiddleware = session({
   saveUninitialized: true,
 })
 
+const options ={
+  key: fs.readFileSync('keys/private.pem'),
+  cert: fs.readFileSync('keys/public.pem')
+}
 io.use((socket, next) => {
   sessionMiddleware(socket.request, socket.request.res, next)
 })
@@ -103,6 +109,7 @@ app.post('/join', (req, res) => {
         req.session.username = newname
         chat.emit('change', {username: originalname, newname})
         res.json({status: 'change', username: originalname, newname})
+        console.log(originalname +' -> '+ newname )
       }
       else{
         req.session.username = newname
@@ -136,4 +143,6 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname + '/html/layout.html')
 })
 
-server.listen(3000);
+https.createServer(options, app).listen(3000, function() {
+  console.log('https server on')
+})
